@@ -11,5 +11,6 @@ COPY ./models.py /app/models.py
 COPY ./config.py /app/config.py
 COPY ./gunicorn_conf.py /app/gunicorn_conf.py
 COPY ./main.py /app/main.py
+COPY ./dependencies.py /app/dependencies.py
 
 CMD ["gunicorn", "-c", "gunicorn_conf.py", "main:app"]

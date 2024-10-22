@@ -1,7 +1,9 @@
 import datetime
+import logging
 from decimal import Decimal
 
 from python_graphql_client import GraphqlClient
+from requests.exceptions import HTTPError
 
 import config
 from models import BtagStatisticsResponseModel
@@ -13,6 +15,14 @@ class NetreferApiClient:
         self.api_token = api_token
         self.client = GraphqlClient(endpoint=config.NETREFER_API_ENDPOINT)
         self.headers = {"Authorization": f"Bearer {api_token}"}
+
+    def execute(self, *args, **kwargs):
+        try:
+            result = self.client.execute(*args, **kwargs)
+        except HTTPError as exc:
+            raise Exception(str(exc))
+
+        return result
 
     def get_btag_statistics(
             self,
@@ -41,7 +51,7 @@ class NetreferApiClient:
             "order": None
         }
 
-        data = self.client.execute(query=players_query, variables=variables, headers=self.headers)
+        data = self.execute(query=players_query, variables=variables, headers=self.headers)
 
         try:
             items = data["data"]["PlayerCollectionSegment"]["items"]
@@ -103,7 +113,7 @@ class NetreferApiClient:
             """
         }
 
-        data = self.client.execute(query=deposits_query, variables=variables, headers=self.headers)
+        data = self.execute(query=deposits_query, variables=variables, headers=self.headers)
 
         try:
             items = data["data"]["DepositCollectionSegment"]["items"]
