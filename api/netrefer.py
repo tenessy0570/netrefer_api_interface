@@ -10,13 +10,16 @@ from models import BtagStatisticsResponseModel
 
 
 class NetreferApiClient:
-    def __init__(self, api_endpoint: str, api_token: str):
+    def __init__(self, api_endpoint: str, api_token: str, api_subscription_key: str):
         self.api_endpoint = api_endpoint
-        self.api_token = api_token
         self.client = GraphqlClient(endpoint=config.NETREFER_API_ENDPOINT)
         self.headers = {"Authorization": f"Bearer {api_token}"}
+        self.params = {"subscription-key": api_subscription_key}
 
     def execute(self, *args, **kwargs):
+        kwargs["params"] = self.params
+        kwargs["headers"] = self.headers
+
         try:
             result = self.client.execute(*args, **kwargs)
         except HTTPError as exc:
@@ -51,7 +54,7 @@ class NetreferApiClient:
             "order": None
         }
 
-        data = self.execute(query=players_query, variables=variables, headers=self.headers)
+        data = self.execute(query=players_query, variables=variables)
 
         try:
             items = data["data"]["PlayerCollectionSegment"]["items"]
@@ -113,7 +116,7 @@ class NetreferApiClient:
             """
         }
 
-        data = self.execute(query=deposits_query, variables=variables, headers=self.headers)
+        data = self.execute(query=deposits_query, variables=variables)
 
         try:
             items = data["data"]["DepositCollectionSegment"]["items"]
