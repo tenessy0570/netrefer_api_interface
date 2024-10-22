@@ -1,4 +1,4 @@
 import os
 
-API_ENDPOINT = os.getenv("API_ENDPOINT", "dengineproblema.com/graphql")
-API_TOKEN = os.getenv("API_TOKEN", "")
+NETREFER_API_ENDPOINT = os.getenv("NETREFER_API_ENDPOINT", "http://api.netrefer.com/api/list/v1")
+NETREFER_API_TOKEN = os.getenv("NETREFER_API_TOKEN", "")
