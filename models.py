@@ -13,3 +13,10 @@ class BtagStatisticsResponseModel(BaseModel):
     ftds_summary: Decimal
     deposits_count: int
     deposits_summary: Decimal
+
+
+class BtagStatisticsInputModel(BaseModel):
+    btag: str
+    from_: datetime.datetime
+    to: datetime.datetime
+
