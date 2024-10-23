@@ -7,5 +7,7 @@ services:
       - "8000:8000"
     environment:
       - NETREFER_API_ENDPOINT=http://api.netrefer.com/api/list/v1
-      - NETREFER_API_TOKEN=
+      - NETREFER_CLIENT_ID=
+      - NETREFER_PASSWORD=
+      - NETREFER_USERNAME=
       - NETREFER_API_SUBSCRIPTION_KEY=

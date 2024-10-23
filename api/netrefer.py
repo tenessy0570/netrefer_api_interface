@@ -1,7 +1,7 @@
 import datetime
-import logging
 from decimal import Decimal
 
+import requests
 from python_graphql_client import GraphqlClient
 from requests.exceptions import HTTPError
 
@@ -10,15 +10,43 @@ from models import BtagStatisticsResponseModel
 
 
 class NetreferApiClient:
-    def __init__(self, api_endpoint: str, api_token: str, api_subscription_key: str):
+    def __init__(
+            self,
+            api_endpoint: str,
+            client_id: str,
+            api_subscription_key: str,
+            netrefer_username: str,
+            netrefer_password
+    ):
         self.api_endpoint = api_endpoint
         self.client = GraphqlClient(endpoint=config.NETREFER_API_ENDPOINT)
-        self.headers = {"Authorization": f"Bearer {api_token}"}
+        self.client_id = client_id
+        self.netrefer_username = netrefer_username
+        self.netrefer_password = netrefer_password
         self.params = {"subscription-key": api_subscription_key}
 
+    def get_access_token(self) -> str:
+        url = f"https://netreferb2cprod.b2clogin.com/netreferb2cprod.onmicrosoft.com/b2c_1_si_pwd/oauth2/v2.0/token" \
+              f"?client_id={self.client_id}&username={self.netrefer_username}&pas" \
+              f"sword={self.netrefer_password}&grant_type=password&scope=openid offline_access " \
+              f"https://netreferb2cprod.onmicrosoft.com/NetRefer.Api.Lists/Lists.Read.All "
+
+        resp = requests.post(url)
+
+        if resp.status_code not in (200, 201):
+            raise Exception(f"An error while retrieving access token: \n{resp.text}")
+
+        return resp.json()["access_token"]
+
     def execute(self, *args, **kwargs):
+        """
+        Create new access token each time we do a request. Doing it just in case so
+        token is always actual.
+        """
+        access_token = self.get_access_token()
+
         kwargs["params"] = self.params
-        kwargs["headers"] = self.headers
+        kwargs["headers"] = {"Authorization": f"Bearer {access_token}"}
 
         try:
             result = self.client.execute(*args, **kwargs)
