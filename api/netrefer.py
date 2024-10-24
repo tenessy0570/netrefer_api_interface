@@ -227,7 +227,12 @@ class NetreferApiClient:
         if not players_by_btag:
             raise Exception(f"Players with btag {btag} not found.")
 
-        registrations_count = len(players_by_btag)
+        registrations_count = len(
+            [
+                u for u in players_by_btag
+                if from_ <= datetime.datetime.fromisoformat(u['registrationTimestamp']) <= to
+            ]
+        )
         ftds_count = 0
         deposits_count = 0
         deposits_summary = Decimal('0')
