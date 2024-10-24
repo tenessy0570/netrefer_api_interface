@@ -102,6 +102,84 @@ class NetreferApiClient:
 
         return deposits
 
+    def get_players(
+            self,
+            skip: int = 0,
+            take: int = 400,
+            btags: list[str] = None,
+            items: list = None
+    ) -> dict:
+        query = """
+          query Player(
+            $skip: Int
+            $take: Int
+            $where: PlayerFilterInput
+            $order: [PlayerSortInput!]
+          ) {
+            player(
+              skip: $skip
+              take: $take
+              where: $where
+              order: $order
+            ) {
+              pageInfo {
+                hasNextPage
+                hasPreviousPage
+              }
+              items {
+                  consumerID
+                  registrationTimestamp
+                  bTag
+                  consumerCountry
+                  consumerState
+                  username
+                  brandID
+                  consumerCurrencyID
+                  consumerStatus
+                  affiliateID
+                  source
+                  rewardPlanID
+                  customerTypeID
+                  cpaProcessed
+                  expired
+                  lastUpdated
+              }
+              totalCount
+            }
+          }
+        """
+
+        variables = {
+            "skip": skip,
+            "take": take,
+        }
+
+        if btags:
+            variables["where"] = {
+                "btag": {"in": btags}
+            }
+
+        resp = self.execute(query=query, variables=variables)
+
+        try:
+            data = resp["data"]
+        except KeyError:
+            raise Exception(resp)
+
+        players = data["player"]["items"]
+        if not data["pageInfo"]["hasNextPage"]:
+            if not items:
+                items = []
+
+            return self.get_players(
+                skip=skip + take,
+                take=take,
+                btags=btags,
+                items=[*items, *players]
+            )
+
+        return players
+
     def get_access_token(self) -> str:
         url = f"https://netreferb2cprod.b2clogin.com/netreferb2cprod.onmicrosoft.com/b2c_1_si_pwd/oauth2/v2.0/token" \
               f"?client_id={self.client_id}&username={self.netrefer_username}&pas" \
