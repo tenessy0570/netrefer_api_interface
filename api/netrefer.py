@@ -74,6 +74,9 @@ class NetreferApiClient:
                     "lte": str(to)
                 }
             },
+            "order": [
+                {"timestamp": "DESC"}
+            ]
         }
 
         if consumer_ids:
@@ -216,105 +219,31 @@ class NetreferApiClient:
             to: datetime.datetime,
             btag: str
     ) -> BtagStatisticsResponseModel:
-        players_query = """
-            query playersQuery($countryCode: String) {
-                player($skip: Int, $take: Int, $where: PlayerFilterInput, $order: [PlayerSortInput!]) {
-                    PlayerCollectionSegment {
-                        Player {
-                              consumerID
-                              bTag
-                              registrationTimestamp
-                        }
-                    }
-                }
-            }
-        """
+        players_by_btag = self.get_players(
+            btags=[btag]
+        )
 
-        variables = {
-            "skip": 0,
-            "take": 800,
-            "where": None,
-            "order": None
-        }
-
-        data = self.execute(query=players_query, variables=variables)
-
-        try:
-            items = data["data"]["PlayerCollectionSegment"]["items"]
-        except KeyError:
-            raise Exception(data)
-
-        consumer_id: int = None
-        registration_timestamp = None
-
-        for player in items:
-            if player["bTag"] != btag:
-                continue
-
-            consumer_id = int(player["consumerID"])
-            registration_timestamp = player["registrationTimestamp"]
-
-        if consumer_id is None:
+        if not players_by_btag:
             raise Exception(f"Player with btag {btag} not found.")
 
-        deposits_query = """
-            query depositsQuery($countryCode: String) {
-                deposit($skip: Int, $take: Int, $where: DepositFilterInput, $order: [DepositSortInput!]) {
-                    DepositCollectionSegment {
-                        Deposit {
-                              consumerID
-                              depositAmount
-                              brandID
-                              consumerCurrencyID
-                              timestamp
-                        }
-                    }
-                }
-            }
-        """
+        consumer_id: int = players_by_btag[0]["consumerID"]
+        registration_timestamp = players_by_btag[0]["registrationTimestamp"]
 
-        variables = {
-            "skip": 0,
-            "take": 800,
-            "where": """
-                {
-                    and: [
-                        {
-                          consumerID: {consumer_id}
-                        },
-                        {
-                          timestamp: {"lte": {to}} 
-                        },
-                        {
-                          timestamp: {"gte": {from_}}
-                        },
-                    ]
-                }
-
-            """.format(consumer_id=consumer_id, to=to, from_=from_),
-            "order": """
-                {
-                    timestamp: "ASC"
-                }
-            """
-        }
-
-        data = self.execute(query=deposits_query, variables=variables)
-
-        try:
-            items = data["data"]["DepositCollectionSegment"]["items"]
-        except KeyError:
-            raise Exception(data)
+        deposits = self.get_deposits(
+            from_=datetime.datetime(year=2010, month=1, day=1),
+            to=datetime.datetime.utcnow(),
+            consumer_ids=[consumer_id]
+        )
 
         response = BtagStatisticsResponseModel(
             btag=btag,
             from_=from_,
             to=to,
             registrations_count=0 if not registration_timestamp else 1,
-            ftds_count=0 if not items else 1,
-            ftds_summary=Decimal(items[0]['depositAmount']) if items else Decimal('0'),
-            deposits_count=len(items),
-            deposits_summary=sum([Decimal(deposit['depositAmount']) for deposit in items])
+            ftds_count=0 if not deposits else 1,
+            ftds_summary=Decimal(deposits[0]['depositAmount']) if deposits else Decimal('0'),
+            deposits_count=len(deposits),
+            deposits_summary=sum([Decimal(deposit['depositAmount']) for deposit in deposits])
         )
 
         return response
