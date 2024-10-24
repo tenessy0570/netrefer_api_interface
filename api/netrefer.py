@@ -1,4 +1,5 @@
 import datetime
+import logging
 from decimal import Decimal
 
 import requests
@@ -24,6 +25,82 @@ class NetreferApiClient:
         self.netrefer_username = netrefer_username
         self.netrefer_password = netrefer_password
         self.params = {"subscription-key": api_subscription_key}
+
+    def get_deposits(
+            self,
+            from_: datetime.datetime,
+            to: datetime.datetime,
+            skip: int = 0,
+            take: int = 400,
+            consumer_ids: list[int] = None,
+            items: list = None
+    ) -> dict:
+        query = """
+          query Deposit(
+            $skip: Int
+            $take: Int
+            $where: DepositFilterInput
+            $order: [DepositSortInput!]
+          ) {
+            deposit(
+              skip: $skip
+              take: $take
+              where: $where
+              order: $order
+            ) {
+              pageInfo {
+                hasNextPage
+                hasPreviousPage
+              }
+              items {
+                consumerID
+                depositAmount
+                brandID
+                consumerCurrencyID
+                timestamp
+              }
+              totalCount
+            }
+          }
+        """
+
+        variables = {
+            "skip": skip,
+            "take": take,
+            "where": {
+                # "consumerID": {"eq": 191936},
+                "timestamp": {
+                    "gte": str(from_),
+                    "lte": str(to)
+                }
+            },
+        }
+
+        if consumer_ids:
+            variables["where"]["consumerId"] = consumer_ids
+
+        resp = self.execute(query=query, variables=variables)
+
+        try:
+            data = resp["data"]
+        except KeyError:
+            raise Exception(resp)
+
+        deposits = data["deposit"]["items"]
+        if not data["pageInfo"]["hasNextPage"]:
+            if not items:
+                items = []
+
+            return self.get_deposits(
+                from_=from_,
+                to=to,
+                skip=skip + take,
+                take=take,
+                consumer_ids=consumer_ids,
+                items=[*items, *deposits]
+            )
+
+        return deposits
 
     def get_access_token(self) -> str:
         url = f"https://netreferb2cprod.b2clogin.com/netreferb2cprod.onmicrosoft.com/b2c_1_si_pwd/oauth2/v2.0/token" \
