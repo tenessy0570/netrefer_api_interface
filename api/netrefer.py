@@ -136,7 +136,8 @@ class NetreferApiClient:
                 skip=skip + take,
                 take=take,
                 consumer_ids=consumer_ids,
-                items=[*items, *deposits]
+                items=[*items, *deposits],
+                limit=limit
             )
 
         return deposits
@@ -220,7 +221,8 @@ class NetreferApiClient:
                 skip=skip + take,
                 take=take,
                 btags=btags,
-                items=[*items, *players]
+                items=[*items, *players],
+                limit=limit
             )
 
         return players
