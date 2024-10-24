@@ -77,7 +77,7 @@ class NetreferApiClient:
         }
 
         if consumer_ids:
-            variables["where"]["consumerId"] = consumer_ids
+            variables["where"]["consumerId"] = {"in": consumer_ids}
 
         resp = self.execute(query=query, variables=variables)
 
