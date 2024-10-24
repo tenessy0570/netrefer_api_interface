@@ -116,7 +116,7 @@ class NetreferApiClient:
         }
 
         if consumer_ids:
-            variables["where"]["consumerId"] = {"in": consumer_ids}
+            variables["where"]["consumerID"] = {"in": consumer_ids}
 
         resp = self.execute(query=query, variables=variables)
 
@@ -198,11 +198,14 @@ class NetreferApiClient:
         variables = {
             "skip": skip,
             "take": take,
+            "order": [
+                {"registrationTimestamp": "DESC"}
+            ]
         }
 
         if btags:
             variables["where"] = {
-                "btag": {"in": btags}
+                "bTag": {"in": btags}
             }
 
         resp = self.execute(query=query, variables=variables)
