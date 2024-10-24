@@ -1,5 +1,4 @@
 import datetime
-import logging
 from decimal import Decimal
 
 import pandas
@@ -28,6 +27,7 @@ class NetreferApiClient:
         self.params = {"subscription-key": api_subscription_key}
 
     def get_access_token(self) -> str:
+        config.logger.info("Retrieving access token")
         url = f"https://netreferb2cprod.b2clogin.com/netreferb2cprod.onmicrosoft.com/b2c_1_si_pwd/oauth2/v2.0/token" \
               f"?client_id={self.client_id}&username={self.netrefer_username}&pas" \
               f"sword={self.netrefer_password}&grant_type=password&scope=openid offline_access " \
@@ -68,6 +68,7 @@ class NetreferApiClient:
             consumer_ids: list[int] = None,
             items: list = None
     ) -> list[dict]:
+        config.logger.info(f"Getting deposits: {from_=}, {to=}, {skip=}, {consumer_ids=}, {limit=}")
         if items and limit:
             if len(items) >= limit:
                 return items
@@ -146,9 +147,10 @@ class NetreferApiClient:
             limit: int = None,
             skip: int = 0,
             take: int = 500,
-            btags: list[str] = None,
+            btags: list[int] = None,
             items: list = None
     ) -> list[dict]:
+        config.logger.info(f"Getting players: {skip=}, {btags=}, {limit=}")
         if items and limit:
             if len(items) >= limit:
                 return items
@@ -174,6 +176,7 @@ class NetreferApiClient:
                   registrationTimestamp
                   bTag
                   username
+                  affiliateID
               }
             }
           }
@@ -189,7 +192,7 @@ class NetreferApiClient:
 
         if btags:
             variables["where"] = {
-                "bTag": {"in": btags}
+                "affiliateID": {"in": btags}
             }
 
         resp = self.execute(query=query, variables=variables)
@@ -218,14 +221,17 @@ class NetreferApiClient:
             self,
             from_: datetime.datetime,
             to: datetime.datetime,
-            btag: str
+            btag: int
     ) -> BtagStatisticsResponseModel:
+        config.logger.info(f"Retrieving btag stats: {btag=}, {from_=}, {to=}")
         players_by_btag = self.get_players(
             btags=[btag]
         )
 
         if not players_by_btag:
             raise Exception(f"Players with btag {btag} not found.")
+
+        config.logger.info(f"Number of players: {len(players_by_btag)}")
 
         registrations_count = len(
             [
