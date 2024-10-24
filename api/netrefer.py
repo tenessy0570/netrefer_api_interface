@@ -28,6 +28,7 @@ class NetreferApiClient:
 
     def get_deposits(
             self,
+            *,
             from_: datetime.datetime,
             to: datetime.datetime,
             skip: int = 0,
@@ -107,6 +108,7 @@ class NetreferApiClient:
 
     def get_players(
             self,
+            *,
             skip: int = 0,
             take: int = 400,
             btags: list[str] = None,
