@@ -116,11 +116,11 @@ class NetreferApiClient:
         resp = self.execute(query=query, variables=variables)
 
         try:
-            data = resp["data"]
+            data = resp["data"]["deposit"]
         except KeyError:
             raise Exception(resp)
 
-        deposits = data["deposit"]["items"]
+        deposits = data["items"]
         if data["pageInfo"]["hasNextPage"]:
             if not items:
                 items = []
@@ -197,11 +197,11 @@ class NetreferApiClient:
         resp = self.execute(query=query, variables=variables)
 
         try:
-            data = resp["data"]
+            data = resp["data"]["player"]
         except KeyError:
             raise Exception(resp)
 
-        players = data["player"]["items"]
+        players = data["items"]
         if data["pageInfo"]["hasNextPage"]:
             if not items:
                 items = []
