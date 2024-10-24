@@ -263,4 +263,8 @@ class NetreferApiClient:
             deposits_summary=sum([Decimal(deposit['depositAmount']) for deposit in deposits])
         )
 
+        # TODO: This might cause an error because sometimes round throws
+        # an exception when trying to pass value of type Decimal as an first argument
+        response.deposits_summary = round(response.deposits_summary, 2)
+        response.ftds_summary = round(response.ftds_summary, 2)
         return response
