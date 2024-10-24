@@ -2,6 +2,7 @@ import datetime
 import logging
 from decimal import Decimal
 
+import pandas
 import requests
 from python_graphql_client import GraphqlClient
 from requests.exceptions import HTTPError
@@ -63,7 +64,7 @@ class NetreferApiClient:
             to: datetime.datetime,
             limit: int = None,
             skip: int = 0,
-            take: int = 400,
+            take: int = 500,
             consumer_ids: list[int] = None,
             items: list = None
     ) -> list[dict]:
@@ -91,8 +92,6 @@ class NetreferApiClient:
               items {
                 consumerID
                 depositAmount
-                brandID
-                consumerCurrencyID
                 timestamp
               }
               totalCount
@@ -119,7 +118,6 @@ class NetreferApiClient:
             variables["where"]["consumerID"] = {"in": consumer_ids}
 
         resp = self.execute(query=query, variables=variables)
-
         try:
             data = resp["data"]["deposit"]
         except KeyError:
@@ -147,7 +145,7 @@ class NetreferApiClient:
             *,
             limit: int = None,
             skip: int = 0,
-            take: int = 400,
+            take: int = 500,
             btags: list[str] = None,
             items: list = None
     ) -> list[dict]:
@@ -170,27 +168,13 @@ class NetreferApiClient:
             ) {
               pageInfo {
                 hasNextPage
-                hasPreviousPage
               }
               items {
                   consumerID
                   registrationTimestamp
                   bTag
-                  consumerCountry
-                  consumerState
                   username
-                  brandID
-                  consumerCurrencyID
-                  consumerStatus
-                  affiliateID
-                  source
-                  rewardPlanID
-                  customerTypeID
-                  cpaProcessed
-                  expired
-                  lastUpdated
               }
-              totalCount
             }
           }
         """
@@ -241,26 +225,53 @@ class NetreferApiClient:
         )
 
         if not players_by_btag:
-            raise Exception(f"Player with btag {btag} not found.")
+            raise Exception(f"Players with btag {btag} not found.")
 
-        consumer_id: int = players_by_btag[0]["consumerID"]
-        registration_timestamp = players_by_btag[0]["registrationTimestamp"]
+        registrations_count = len(players_by_btag)
+        ftds_count = 0
+        deposits_count = 0
+        deposits_summary = Decimal('0')
+        ftds_summary = Decimal('0')
 
         deposits = self.get_deposits(
             from_=from_,
             to=to,
-            consumer_ids=[consumer_id]
+            consumer_ids=[player["consumerID"] for player in players_by_btag]
         )
+
+        df = pandas.DataFrame.from_records(deposits)
+        deposits_count += len(df)
+
+        if deposits_count == 0:
+            return BtagStatisticsResponseModel(
+                btag=btag,
+                from_=from_,
+                to=to,
+                registrations_count=registrations_count,
+                ftds_count=ftds_count,
+                ftds_summary=ftds_summary,
+                deposits_count=deposits_count,
+                deposits_summary=deposits_summary,
+            )
+
+        for index, row in df.iterrows():
+            deposits_summary += Decimal(str(row['depositAmount']))
+
+        df_first_deposits = df.sort_values(by="timestamp").groupby("consumerID").first()
+        ftds_count += len(df_first_deposits)
+
+        for index, row in df_first_deposits.iterrows():
+            ftds_summary += Decimal(str(row['depositAmount']))
 
         response = BtagStatisticsResponseModel(
             btag=btag,
             from_=from_,
             to=to,
-            registrations_count=0 if not registration_timestamp else 1,
-            ftds_count=0 if not deposits else 1,
-            ftds_summary=Decimal(deposits[0]['depositAmount']) if deposits else Decimal('0'),
-            deposits_count=len(deposits),
-            deposits_summary=sum([Decimal(deposit['depositAmount']) for deposit in deposits])
+            registrations_count=registrations_count,
+            ftds_count=ftds_count,
+            ftds_summary=ftds_summary,
+            deposits_count=deposits_count,
+            deposits_summary=deposits_summary,
         )
 
         # TODO: This might cause an error because sometimes round throws
