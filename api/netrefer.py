@@ -26,6 +26,36 @@ class NetreferApiClient:
         self.netrefer_password = netrefer_password
         self.params = {"subscription-key": api_subscription_key}
 
+    def get_access_token(self) -> str:
+        url = f"https://netreferb2cprod.b2clogin.com/netreferb2cprod.onmicrosoft.com/b2c_1_si_pwd/oauth2/v2.0/token" \
+              f"?client_id={self.client_id}&username={self.netrefer_username}&pas" \
+              f"sword={self.netrefer_password}&grant_type=password&scope=openid offline_access " \
+              f"https://netreferb2cprod.onmicrosoft.com/NetRefer.Api.Lists/Lists.Read.All "
+
+        resp = requests.post(url)
+
+        if resp.status_code not in (200, 201):
+            raise Exception(f"An error while retrieving access token: \n{resp.text}")
+
+        return resp.json()["access_token"]
+
+    def execute(self, *args, **kwargs):
+        """
+        Create new access token each time we do a request. Doing it just in case so
+        token is always actual.
+        """
+        access_token = self.get_access_token()
+
+        kwargs["params"] = self.params
+        kwargs["headers"] = {"Authorization": f"Bearer {access_token}"}
+
+        try:
+            result = self.client.execute(*args, **kwargs)
+        except HTTPError as exc:
+            raise Exception(str(exc))
+
+        return result
+
     def get_deposits(
             self,
             *,
@@ -91,7 +121,7 @@ class NetreferApiClient:
             raise Exception(resp)
 
         deposits = data["deposit"]["items"]
-        if not data["pageInfo"]["hasNextPage"]:
+        if data["pageInfo"]["hasNextPage"]:
             if not items:
                 items = []
 
@@ -172,7 +202,7 @@ class NetreferApiClient:
             raise Exception(resp)
 
         players = data["player"]["items"]
-        if not data["pageInfo"]["hasNextPage"]:
+        if data["pageInfo"]["hasNextPage"]:
             if not items:
                 items = []
 
@@ -184,36 +214,6 @@ class NetreferApiClient:
             )
 
         return players
-
-    def get_access_token(self) -> str:
-        url = f"https://netreferb2cprod.b2clogin.com/netreferb2cprod.onmicrosoft.com/b2c_1_si_pwd/oauth2/v2.0/token" \
-              f"?client_id={self.client_id}&username={self.netrefer_username}&pas" \
-              f"sword={self.netrefer_password}&grant_type=password&scope=openid offline_access " \
-              f"https://netreferb2cprod.onmicrosoft.com/NetRefer.Api.Lists/Lists.Read.All "
-
-        resp = requests.post(url)
-
-        if resp.status_code not in (200, 201):
-            raise Exception(f"An error while retrieving access token: \n{resp.text}")
-
-        return resp.json()["access_token"]
-
-    def execute(self, *args, **kwargs):
-        """
-        Create new access token each time we do a request. Doing it just in case so
-        token is always actual.
-        """
-        access_token = self.get_access_token()
-
-        kwargs["params"] = self.params
-        kwargs["headers"] = {"Authorization": f"Bearer {access_token}"}
-
-        try:
-            result = self.client.execute(*args, **kwargs)
-        except HTTPError as exc:
-            raise Exception(str(exc))
-
-        return result
 
     def get_btag_statistics(
             self,
