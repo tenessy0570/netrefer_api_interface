@@ -61,11 +61,16 @@ class NetreferApiClient:
             *,
             from_: datetime.datetime,
             to: datetime.datetime,
+            limit: int = None,
             skip: int = 0,
             take: int = 400,
             consumer_ids: list[int] = None,
             items: list = None
-    ) -> dict:
+    ) -> list[dict]:
+        if items and limit:
+            if len(items) >= limit:
+                return items
+
         query = """
           query Deposit(
             $skip: Int
@@ -139,11 +144,16 @@ class NetreferApiClient:
     def get_players(
             self,
             *,
+            limit: int = None,
             skip: int = 0,
             take: int = 400,
             btags: list[str] = None,
             items: list = None
-    ) -> dict:
+    ) -> list[dict]:
+        if items and limit:
+            if len(items) >= limit:
+                return items
+
         query = """
           query Player(
             $skip: Int
