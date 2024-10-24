@@ -247,8 +247,8 @@ class NetreferApiClient:
         registration_timestamp = players_by_btag[0]["registrationTimestamp"]
 
         deposits = self.get_deposits(
-            from_=datetime.datetime(year=2010, month=1, day=1),
-            to=datetime.datetime.utcnow(),
+            from_=from_,
+            to=to,
             consumer_ids=[consumer_id]
         )
 
