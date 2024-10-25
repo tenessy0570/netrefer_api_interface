@@ -25,9 +25,10 @@ class NetreferApiClient:
         self.netrefer_username = netrefer_username
         self.netrefer_password = netrefer_password
         self.params = {"subscription-key": api_subscription_key}
+        self.access_token = None
 
-    def get_access_token(self) -> str:
-        config.logger.info("Retrieving access token")
+    def update_access_token(self):
+        config.logger.info("Updating access token")
         url = f"https://netreferb2cprod.b2clogin.com/netreferb2cprod.onmicrosoft.com/b2c_1_si_pwd/oauth2/v2.0/token" \
               f"?client_id={self.client_id}&username={self.netrefer_username}&pas" \
               f"sword={self.netrefer_password}&grant_type=password&scope=openid offline_access " \
@@ -38,17 +39,12 @@ class NetreferApiClient:
         if resp.status_code not in (200, 201):
             raise Exception(f"An error while retrieving access token: \n{resp.text}")
 
-        return resp.json()["access_token"]
+        token = resp.json()["access_token"]
+        self.access_token = token
 
     def execute(self, *args, **kwargs):
-        """
-        Create new access token each time we do a request. Doing it just in case so
-        token is always actual.
-        """
-        access_token = self.get_access_token()
-
         kwargs["params"] = self.params
-        kwargs["headers"] = {"Authorization": f"Bearer {access_token}"}
+        kwargs["headers"] = {"Authorization": f"Bearer {self.access_token}"}
 
         try:
             result = self.client.execute(*args, **kwargs)
@@ -68,8 +64,11 @@ class NetreferApiClient:
             consumer_ids: list[int] = None,
             items: list = None
     ) -> list[dict]:
+        if items is None:
+            items = []
+
         config.logger.info(f"Getting deposits: {from_=}, {to=}, {skip=}, {consumer_ids=}, {limit=}")
-        if items and limit:
+        if limit:
             if len(items) >= limit:
                 return items
 
@@ -110,9 +109,10 @@ class NetreferApiClient:
                     "lte": str(to)
                 }
             },
-            "order": [
-                {"timestamp": "DESC"}
-            ]
+            # THIS MIGHT SLOW THE API RESPONSE
+            # "order": [
+            #     {"timestamp": "DESC"}
+            # ]
         }
 
         if consumer_ids:
@@ -126,9 +126,6 @@ class NetreferApiClient:
 
         deposits = data["items"]
         if data["pageInfo"]["hasNextPage"]:
-            if not items:
-                items = []
-
             return self.get_deposits(
                 from_=from_,
                 to=to,
@@ -139,19 +136,24 @@ class NetreferApiClient:
                 limit=limit
             )
 
-        return deposits
+        return [*items, *deposits]
 
     def get_players(
             self,
             *,
+            from_: datetime.datetime,
+            to: datetime.datetime,
             limit: int = None,
             skip: int = 0,
-            take: int = 500,
+            take: int = 250,
             btags: list[int] = None,
             items: list = None
     ) -> list[dict]:
+        if items is None:
+            items = []
+
         config.logger.info(f"Getting players: {skip=}, {btags=}, {limit=}")
-        if items and limit:
+        if limit:
             if len(items) >= limit:
                 return items
 
@@ -174,9 +176,6 @@ class NetreferApiClient:
               items {
                   consumerID
                   registrationTimestamp
-                  bTag
-                  username
-                  affiliateID
               }
             }
           }
@@ -185,15 +184,20 @@ class NetreferApiClient:
         variables = {
             "skip": skip,
             "take": take,
-            "order": [
-                {"registrationTimestamp": "DESC"}
-            ]
+            "where": {
+                "registrationTimestamp": {
+                    "gte": str(from_),
+                    "lte": str(to)
+                }
+            }
+            # THIS MIGHT SLOW THE API RESPONSE
+            # "order": [
+            #     {"registrationTimestamp": "DESC"}
+            # ]
         }
 
         if btags:
-            variables["where"] = {
-                "affiliateID": {"in": btags}
-            }
+            variables["where"]["affiliateID"] = {"in": btags}
 
         resp = self.execute(query=query, variables=variables)
 
@@ -204,10 +208,9 @@ class NetreferApiClient:
 
         players = data["items"]
         if data["pageInfo"]["hasNextPage"]:
-            if not items:
-                items = []
-
             return self.get_players(
+                from_=from_,
+                to=to,
                 skip=skip + take,
                 take=take,
                 btags=btags,
@@ -215,7 +218,7 @@ class NetreferApiClient:
                 limit=limit
             )
 
-        return players
+        return [*items, *players]
 
     def get_btag_statistics(
             self,
@@ -223,8 +226,12 @@ class NetreferApiClient:
             to: datetime.datetime,
             btag: int
     ) -> BtagStatisticsResponseModel:
+        self.update_access_token()
+
         config.logger.info(f"Retrieving btag stats: {btag=}, {from_=}, {to=}")
         players_by_btag = self.get_players(
+            from_=from_,
+            to=to,
             btags=[btag]
         )
 
@@ -233,12 +240,7 @@ class NetreferApiClient:
 
         config.logger.info(f"Number of players: {len(players_by_btag)}")
 
-        registrations_count = len(
-            [
-                u for u in players_by_btag
-                if from_ <= datetime.datetime.fromisoformat(u['registrationTimestamp']) <= to
-            ]
-        )
+        registrations_count = len(players_by_btag)
         ftds_count = 0
         deposits_count = 0
         deposits_summary = Decimal('0')
@@ -255,7 +257,7 @@ class NetreferApiClient:
 
         if deposits_count == 0:
             return BtagStatisticsResponseModel(
-                btag=btag,
+                btag=str(btag),
                 from_=from_,
                 to=to,
                 registrations_count=registrations_count,
@@ -275,7 +277,7 @@ class NetreferApiClient:
             ftds_summary += Decimal(str(row['depositAmount']))
 
         response = BtagStatisticsResponseModel(
-            btag=btag,
+            btag=str(btag),
             from_=from_,
             to=to,
             registrations_count=registrations_count,
