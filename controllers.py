@@ -16,7 +16,7 @@ def register(input_data: BtagStatisticsInputModel) -> BtagStatisticsResponseMode
         result = client.get_btag_statistics(
             from_=input_data.from_,
             to=input_data.to,
-            btag=input_data.btag
+            btag=int(input_data.btag)
         )
     except Exception as exc:
         logging.error(exc)
